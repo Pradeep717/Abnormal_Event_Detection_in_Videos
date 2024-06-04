@@ -1,0 +1,11 @@
+# Ignore virtual environments
+venv/
+myenv/
+
+# Ignore videos in data/raw directory
+data/
+
+# Ignore other unwanted files
+models/
+
+

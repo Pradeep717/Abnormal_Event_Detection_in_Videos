@@ -1,0 +1,15 @@
+data:
+  anomaly_threshold: 0.6
+  fps: 5
+  frame_height: 227
+  frame_width: 227
+  processed_dir: data/processed
+  raw_dir: data/raw
+  test_video_path: data/test_dir/test_video.avi
+training:
+  anomaly_model_path: models/anomaly_detector.pth
+  batch_size: 8
+  epochs: 2
+  input_dim: 163213
+  learning_rate: 0.001
+  transformer_model_path: models/video_transformer.pth
