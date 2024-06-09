@@ -38,6 +38,10 @@ class TemporalModel(nn.Module):
         return out
 
 def train_model():
+    # Check for CUDA availability
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
     # Load configuration
     with open('config/config.yaml', 'r') as f:
         config = yaml.safe_load(f)
@@ -76,13 +80,13 @@ def train_model():
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    swin_model = create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=0)
+    swin_model = create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=0).to(device)
     swin_model.eval()
 
     feature_dim = 1024
     hidden_dim = 512
     num_layers = 2
-    temporal_model = TemporalModel(feature_dim, hidden_dim, num_layers)
+    temporal_model = TemporalModel(feature_dim, hidden_dim, num_layers).to(device)
     temporal_model.train()
 
     criterion = nn.MSELoss()
@@ -92,7 +96,7 @@ def train_model():
         temporal_model.train()
         train_loss = 0.0
         for inputs in tqdm(train_loader):
-            inputs = inputs.float()
+            inputs = inputs.to(device).float()
             batch_size, num_frames, channels, height, width = inputs.size()
             inputs = inputs.view(-1, channels, height, width)
 
@@ -100,7 +104,7 @@ def train_model():
                 features = swin_model(inputs)
 
             features = features.view(batch_size, num_frames, -1)
-            features = features.float()
+            features = features.to(device).float()
 
             optimizer.zero_grad()
             outputs = temporal_model(features)
@@ -116,13 +120,13 @@ def train_model():
         val_loss = 0.0
         with torch.no_grad():
             for inputs in val_loader:
-                inputs = inputs.float()
+                inputs = inputs.to(device).float()
                 batch_size, num_frames, channels, height, width = inputs.size()
                 inputs = inputs.view(-1, channels, height, width)
 
                 features = swin_model(inputs)
                 features = features.view(batch_size, num_frames, -1)
-                features = features.float()
+                features = features.to(device).float()
 
                 outputs = temporal_model(features)
                 loss = criterion(outputs, features[:, -1, :])

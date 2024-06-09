@@ -2,7 +2,8 @@ import cv2
 import numpy as np
 import torch
 import yaml
-from train_anomaly import AnomalyDetector
+from train_anomaly import VAE
+import matplotlib.pyplot as plt
 
 # Load configuration
 with open('config/config.yaml', 'r') as f:
@@ -14,7 +15,7 @@ test_video_path = config['data']['test_video_path']
 input_dim = config['training']['input_dim']
 
 # Define and load the anomaly detection model
-model = AnomalyDetector(input_dim)
+model = VAE(input_dim)
 model.load_state_dict(torch.load(model_path))
 model.eval()
 
@@ -24,6 +25,7 @@ if not cap.isOpened():
     exit()
 
 frame_sequence = []
+anomaly_scores = []
 
 while cap.isOpened():
     ret, frame = cap.read()
@@ -52,8 +54,9 @@ while cap.isOpened():
 
         with torch.no_grad():
             input_tensor = torch.tensor(input_data, dtype=torch.float32).view(-1, input_dim)
-            output_tensor = model(input_tensor)
-            loss = np.mean((output_tensor.numpy() - input_tensor.numpy())**2)
+            output_tensor, _, _ = model(input_tensor)
+            loss = np.mean(np.abs(output_tensor.numpy() - input_tensor.numpy()))
+            anomaly_scores.append(loss)
 
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
@@ -69,3 +72,9 @@ while cap.isOpened():
 
 cap.release()
 cv2.destroyAllWindows()
+
+# Plot the anomaly scores
+plt.plot(anomaly_scores)
+plt.ylabel('Anomaly score')
+plt.xlabel('Frame number')
+plt.show()

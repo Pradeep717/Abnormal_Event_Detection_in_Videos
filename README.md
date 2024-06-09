@@ -147,7 +147,14 @@ for epoch in range(epochs):
 
 print("Training complete. Model saved.")
 
-
+//Git commands
+echo "# Abnormal_Event_Detection_in_Videos" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/Pradeep717/Abnormal_Event_Detection_in_Videos.git
+git push -u origin main
 
 
 //Anormaly model 

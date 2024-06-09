@@ -5,6 +5,10 @@ from timm import create_model
 from train_transformer import TemporalModel
 import yaml
 
+# Check for CUDA availability
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
+
 # Load configuration
 with open('config/config.yaml', 'r') as f:
     config = yaml.safe_load(f)
@@ -13,14 +17,15 @@ model_path = config['training']['transformer_model_path']
 anomaly_threshold = config['data']['anomaly_threshold']
 test_video_path = config['data']['test_video_path']
 
-swin_model = create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=0)
+swin_model = create_model('swin_base_patch4_window7_224', pretrained=True, num_classes=0).to(device)
 swin_model.eval()
 
 feature_dim = 1024
 hidden_dim = 512
 num_layers = 2
 temporal_model = TemporalModel(feature_dim, hidden_dim, num_layers)
-temporal_model.load_state_dict(torch.load(model_path))
+temporal_model.load_state_dict(torch.load(model_path, map_location=device))
+temporal_model = temporal_model.to(device)
 temporal_model.eval()
 
 cap = cv2.VideoCapture(test_video_path)
@@ -47,13 +52,13 @@ while cap.isOpened():
     imagedump = np.repeat(imagedump, 3, axis=2)
 
     with torch.no_grad():
-        inputs = torch.from_numpy(imagedump).float()
+        inputs = torch.from_numpy(imagedump).float().to(device)
         inputs = inputs.view(-1, 3, 224, 224)
         features = swin_model(inputs)
         features = features.view(1, 10, -1)
         outputs = temporal_model(features)
 
-    loss = np.mean((outputs.detach().numpy() - features[:, -1, :].detach().numpy())**2)
+    loss = np.mean((outputs.cpu().detach().numpy() - features[:, -1, :].cpu().detach().numpy())**2)
 
     if cv2.waitKey(10) & 0xFF == ord('q'):
         break

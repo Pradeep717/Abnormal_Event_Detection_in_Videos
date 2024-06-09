@@ -26,16 +26,18 @@ class AnomalyDataset(Dataset):
     def __getitem__(self, idx):
         return torch.tensor(self.data[idx], dtype=torch.float32)
 
-# Define the anomaly detection model
-class AnomalyDetector(nn.Module):
+# Define the VAE model
+class VAE(nn.Module):
     def __init__(self, input_dim):
-        super(AnomalyDetector, self).__init__()
+        super(VAE, self).__init__()
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, 512),
             nn.ReLU(),
             nn.Linear(512, 128),
             nn.ReLU()
         )
+        self.mu_layer = nn.Linear(128, 128)
+        self.logvar_layer = nn.Linear(128, 128)
         self.decoder = nn.Sequential(
             nn.Linear(128, 512),
             nn.ReLU(),
@@ -45,8 +47,13 @@ class AnomalyDetector(nn.Module):
 
     def forward(self, x):
         encoded = self.encoder(x)
-        decoded = self.decoder(encoded)
-        return decoded
+        mu = self.mu_layer(encoded)
+        logvar = self.logvar_layer(encoded)
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        z = eps.mul(std).add_(mu)
+        decoded = self.decoder(z)
+        return decoded, mu, logvar
 
 def train_anomaly_detector():
     train_data_path = os.path.join(processed_data_dir, 'training.npy')
@@ -62,7 +69,7 @@ def train_anomaly_detector():
     with open('config/config.yaml', 'w') as f:
         yaml.dump(config, f)
 
-    model = AnomalyDetector(input_dim)
+    model = VAE(input_dim)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -73,8 +80,10 @@ def train_anomaly_detector():
         for inputs in train_loader:
             inputs = inputs.view(inputs.size(0), -1)
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, inputs)
+            outputs, mu, logvar = model(inputs)
+            recon_loss = criterion(outputs, inputs)
+            kl_div = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+            loss = recon_loss + kl_div
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -82,7 +91,7 @@ def train_anomaly_detector():
         print(f"Epoch [{epoch+1}/{epochs}], Loss: {running_loss/len(train_loader)}")
 
     torch.save(model.state_dict(), model_path)
-    print("Training completed. Model saved at")
+    print("Training completed. Model saved at", model_path)
 
 if __name__ == "__main__":
     train_anomaly_detector()
